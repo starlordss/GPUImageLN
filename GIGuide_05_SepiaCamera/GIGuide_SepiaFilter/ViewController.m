@@ -83,7 +83,7 @@
         NSLog(@"按钮被选中....开始录制");
         //如果已经存在文件，AVAssetWriter会有异常
         unlink([_moviePath UTF8String]);
-        // 给滤镜添加movieWriter
+        // 给滤镜添加movieWriter 
         [self.filter addTarget:self.movieWriter];
         self.videoCamera.audioEncodingTarget = self.movieWriter;
         // 开始录制
