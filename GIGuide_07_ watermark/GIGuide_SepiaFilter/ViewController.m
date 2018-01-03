@@ -8,7 +8,7 @@
 
 #import "ViewController.h"
 #import <GPUImage.h>
-#import <AssetsLibrary/AssetsLibrary.h>
+#import <Photos/Photos.h>
 
 @interface ViewController ()
 /**展示滤镜效果的视图*/
@@ -40,19 +40,18 @@
     self.movie.runBenchmark = YES;
     // 按实际速度播放视频
     self.movie.playAtActualSpeed = YES;
-    
+
     // 加水印到视频中
     CGSize size = self.view.bounds.size;
+    NSLog(@"%@",NSStringFromCGSize(size));
     // 水印文字
     UILabel *watermarkLbl = [[UILabel alloc] initWithFrame:CGRectMake(100, 100, 200, 50)];
     watermarkLbl.text = @"水印水印——眔眔的爱";
     watermarkLbl.font = [UIFont systemFontOfSize:30];
     watermarkLbl.textColor = [UIColor cyanColor];
     // 水印图片
-    UIImage *image = [UIImage imageNamed:@"watermark.png"];
-    UIImageView *imageView = [[UIImageView alloc] initWithImage:image];
+    UIImageView *imageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"watermark.png"]];
     UIView *subView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, size.width, size.height)];
-    subView.backgroundColor = [UIColor clearColor];
     imageView.center = CGPointMake(subView.bounds.size.width / 2, subView.bounds.size.height / 2);
     [subView addSubview:imageView];
     [subView addSubview:watermarkLbl];
@@ -88,15 +87,12 @@
     
     CADisplayLink *link = [CADisplayLink displayLinkWithTarget:self selector:@selector(updateProgress)];
     [link addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
-    link.paused = NO;
+//    link.paused = NO;
     
     __weak typeof(self) _self = self;
     [progressFilter setFrameProcessingCompletionBlock:^(GPUImageOutput *output, CMTime time) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            CGRect frame = imageView.frame;
-            frame.origin.x += 2;
-            frame.origin.y += 2;
-            imageView.frame = frame;
+            imageView.transform = CGAffineTransformTranslate(imageView.transform, 2, 2);
             [uielement updateWithTimestamp:time];
         });
        
@@ -107,30 +103,28 @@
         [_self.filter removeTarget:_self.movieWriter];
         [_self.movieWriter finishRecording];
         
-        ALAssetsLibrary *library = [[ALAssetsLibrary alloc] init];
-        if (UIVideoAtPathIsCompatibleWithSavedPhotosAlbum(recordPath))
-        {
-            [library writeVideoAtPathToSavedPhotosAlbum:recordURL completionBlock:^(NSURL *assetURL, NSError *error)
-             {
-                 dispatch_async(dispatch_get_main_queue(), ^{
-                     
-                     if (error) {
-                         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"视频保存失败" message:@"" preferredStyle:UIAlertControllerStyleAlert];
-                         UIAlertAction *action = [UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleCancel handler:nil];
-                         [alert addAction:action];
-                         [_self presentViewController:alert animated:YES completion:nil];
-                     } else {
-                         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"视频保存成功" message:@"" preferredStyle:UIAlertControllerStyleAlert];
-                         UIAlertAction *action = [UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleCancel handler:nil];
-                         [alert addAction:action];
-                         [_self presentViewController:alert animated:YES completion:nil];
-                     }
-                 });
-             }];
+        __block NSString *createdAssetID = nil;
+        if (UIVideoAtPathIsCompatibleWithSavedPhotosAlbum(recordPath)) {
+            [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
+                createdAssetID = [PHAssetChangeRequest creationRequestForAssetFromVideoAtFileURL:recordURL].placeholderForCreatedAsset.localIdentifier;
+            } completionHandler:^(BOOL success, NSError * _Nullable error) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    
+                    if (error) {
+                        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"视频保存失败" message:@"" preferredStyle:UIAlertControllerStyleAlert];
+                        UIAlertAction *action = [UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleCancel handler:nil];
+                        [alert addAction:action];
+                        [_self presentViewController:alert animated:YES completion:nil];
+                    } else {
+                        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"视频保存成功" message:@"" preferredStyle:UIAlertControllerStyleAlert];
+                        UIAlertAction *action = [UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleCancel handler:nil];
+                        [alert addAction:action];
+                        [_self presentViewController:alert animated:YES completion:nil];
+                    }
+                });
+            }];
         }
-        
     }];
-    
 }
 #pragma mark - UI EVENT
 - (void)updateProgress {
@@ -157,7 +151,6 @@
 {
     if (_filterView == nil) {
         _filterView = [[GPUImageView alloc] initWithFrame:self.view.bounds];
-//        _filterView.fillMode = kGPUImageFillModePreserveAspectRatio;
     }
     return _filterView;
 }
